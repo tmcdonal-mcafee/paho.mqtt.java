@@ -14,6 +14,8 @@
 package org.eclipse.paho.client.mqttv3.test.utilities;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.logging.FileHandler;
 import java.util.logging.Logger;
 
@@ -102,5 +104,23 @@ public class Utility {
       exception.printStackTrace();
     }
     return handler;
+  }
+  
+  /**
+   * Returns a list of running threads that match the given clientId.
+   * @param clientId
+   * @return
+   */
+  public static Set<Thread> getThreadsForClientId(String clientId){
+	  Set<Thread> allThreads = Thread.getAllStackTraces().keySet();
+	  Set<Thread> clientThreads = new HashSet<Thread>();
+	  
+	  
+	  for(Thread thread: allThreads){
+		  if(thread.getName().contains(clientId)) {
+			  clientThreads.add(thread);
+		  }
+	  }
+	  return clientThreads;
   }
 }

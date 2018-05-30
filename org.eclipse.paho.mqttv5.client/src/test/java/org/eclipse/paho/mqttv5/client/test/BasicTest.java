@@ -1,6 +1,7 @@
 package org.eclipse.paho.mqttv5.client.test;
 
 import java.net.URI;
+import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -52,8 +53,6 @@ public class BasicTest {
 		}
 	}
 
-	
-
 	/**
 	 * Very simple test case that validates that the client can connect and then
 	 * disconnect cleanly.
@@ -69,6 +68,94 @@ public class BasicTest {
 				null, 5000);
 		// Client Should now be disconnected.
 		TestClientUtilities.disconnectAndCloseClient(asyncClient, 5000);
+	}
+
+	/**
+	 * Very simple test case that validates that once Forcibly disconnected, all
+	 * threads are closed before returning control.
+	 * 
+	 * @throws MqttException
+	 */
+	@Test
+	public void testCleanForciblyDisconnectThreads() throws MqttException {
+		String methodName = Utility.getMethodName();
+		LoggingUtilities.banner(log, SubscribeTests.class, methodName);
+		// This utility method already asserts that we are connected, so good so far
+		MqttAsyncClient asyncClient = TestClientUtilities.connectAndGetClient(serverURI.toString(), methodName, null,
+				null, 5000);
+
+		Set<Thread> clientThreads = Utility.getThreadsForClientId(methodName);
+		log.info(String.format("After Connect, there are %d client threads running.",  clientThreads.size()));
+		for (Thread thread : clientThreads) {
+			log.info(" |- Thread: " + thread.getName());
+		}
+
+		Assert.assertEquals(4, clientThreads.size());
+
+		log.info("Forcibly Disconnecting the client.");
+		asyncClient.disconnectForcibly();
+
+		Set<Thread> clientThreadsAfterDisconnect = Utility.getThreadsForClientId(methodName);
+
+		log.info(String.format("After Forced Disconnect, there are %d client threads running.",  clientThreadsAfterDisconnect.size()));
+		for (Thread thread : clientThreadsAfterDisconnect) {
+			log.info(" |- Thread: " + thread.getName());
+		}
+		Assert.assertEquals(0, clientThreadsAfterDisconnect.size());
+		asyncClient.close();
+	}
+	
+	
+	/**
+	 * Very simple test case that validates that once normally disconnected, all
+	 * threads are closed within a reasonable period of time.
+	 * 
+	 * @throws MqttException
+	 * @throws InterruptedException 
+	 */
+	@Test
+	public void testCleanDisconnectThreads() throws MqttException, InterruptedException {
+		String methodName = Utility.getMethodName();
+		LoggingUtilities.banner(log, SubscribeTests.class, methodName);
+		// This utility method already asserts that we are connected, so good so far
+		MqttAsyncClient asyncClient = TestClientUtilities.connectAndGetClient(serverURI.toString(), methodName, null,
+				null, 5000);
+
+		Set<Thread> clientThreads = Utility.getThreadsForClientId(methodName);
+		log.info(String.format("After Connect, there are %d client threads running.",  clientThreads.size()));
+		for (Thread thread : clientThreads) {
+			log.info(" |- Thread: " + thread.getName());
+		}
+
+		Assert.assertEquals(4, clientThreads.size());
+
+		log.info("Forcibly Disconnecting the client.");
+		IMqttToken disconnectToken = asyncClient.disconnect();
+		disconnectToken.waitForCompletion();
+		
+		// Wait for the threads to disappear
+		Set<Thread> clientThreadsAfterDisconnect = Utility.getThreadsForClientId(methodName);
+		log.info(String.format("Immediately after  Disconnect, there are %d client threads running. ",  clientThreadsAfterDisconnect.size()));
+		
+		// give it some time to reconnect
+		long currentTime = System.currentTimeMillis();
+		int timeout = 5000;
+		while (clientThreadsAfterDisconnect.size() > 0) {
+			long now = System.currentTimeMillis();
+			if ((currentTime + timeout) < now) {
+				log.warning("Timeout Exceeded");
+				break;
+			}
+			clientThreadsAfterDisconnect = Utility.getThreadsForClientId(methodName);
+			log.info(String.format("There are %d client threads running. ",  clientThreadsAfterDisconnect.size()));
+			Thread.sleep(500);
+		}
+		log.info(String.format("There are %d client threads running. ",  clientThreadsAfterDisconnect.size()));
+		for (Thread thread : clientThreadsAfterDisconnect) {
+			log.info(" |- Thread: " + thread.getName());
+		}
+		Assert.assertEquals(0, clientThreadsAfterDisconnect.size());
+		asyncClient.close();
 	}
 
 	/**

@@ -626,6 +626,7 @@ public class ClientComms {
 		} finally {
 			token.internalTok.markComplete(null, null);
 			shutdownConnection(token, null, null);
+			shutdownExecutorService();
 		}
 	}
 
@@ -847,6 +848,7 @@ public class ClientComms {
 			} finally {
 				token.internalTok.markComplete(null, null);
 				shutdownConnection(token, null, null);
+				shutdownExecutorService();
 			}
 		}
 	}

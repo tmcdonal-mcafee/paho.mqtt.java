@@ -1197,7 +1197,7 @@ public class ClientState {
 	 * @param reason The root cause of the disconnection, or null if it is a clean disconnect
 	 * @return {@link Vector} 
 	 */
-	public Vector resolveOldTokens(MqttException reason) {
+	public Vector<MqttToken> resolveOldTokens(MqttException reason) {
 		final String methodName = "resolveOldTokens";
 		//@TRACE 632=reason {0}
 		log.fine(CLASS_NAME,methodName,"632", new Object[] {reason});

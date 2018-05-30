@@ -466,8 +466,8 @@ public class ClientComms {
 				}
 			}
 
-			Vector toksToNot = clientState.resolveOldTokens(reason);
-			Enumeration toksToNotE = toksToNot.elements();
+			Vector<MqttToken> toksToNot = clientState.resolveOldTokens(reason);
+			Enumeration<MqttToken> toksToNotE = toksToNot.elements();
 			while(toksToNotE.hasMoreElements()) {
 				MqttToken tok = (MqttToken)toksToNotE.nextElement();
 
@@ -551,6 +551,7 @@ public class ClientComms {
 		finally {
 			token.internalTok.markComplete(null, null);
 			shutdownConnection(token, null);
+			shutdownExecutorService();
 		}
 	}
 
@@ -770,6 +771,7 @@ public class ClientComms {
 			finally {
 				token.internalTok.markComplete(null, null);
 				shutdownConnection(token, null);
+				shutdownExecutorService();
 			}
 		}
 	}
