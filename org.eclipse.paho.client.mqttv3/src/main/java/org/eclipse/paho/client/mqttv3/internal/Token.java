@@ -233,6 +233,10 @@ public class Token {
 //	}
 
 	public void waitUntilSent() throws MqttException {
+		waitUntilSent( 0 );
+	}
+
+	public void waitUntilSent( long timeout) throws MqttException {
 		final String methodName = "waitUntilSent";
 		synchronized (sentLock) {
 			synchronized (responseLock) {
@@ -240,17 +244,25 @@ public class Token {
 					throw this.exception;
 				}
 			}
-			while (!sent) {
+			if (!sent) {
 				try {
 					//@TRACE 409=wait key={0}
 					log.fine(CLASS_NAME,methodName, "409",new Object[]{getKey()});
 
-					sentLock.wait();
+					if( timeout > 0 )
+					{
+						sentLock.wait( timeout );
+					}
+					else
+					{
+						sentLock.wait();
+					}
+
 				} catch (InterruptedException e) {
 				}
 			}
 			
-			while (!sent) {
+			if (!sent) {
 				if (this.exception == null) {
 					throw ExceptionHelper.createMqttException(MqttException.REASON_CODE_UNEXPECTED_ERROR);
 				}

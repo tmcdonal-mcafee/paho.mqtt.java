@@ -150,6 +150,61 @@ public class CommsCallback implements Runnable {
 	}
 
 	public void run() {
+		/*
+		 * We added this thread due to the fact that the operation completion queue
+		 * and the incoming message queue were handled in the same thread. Unfortunately,
+		 * this can easily deadlock when you are publishing and receive an incoming message
+		 * at the same time. This thread allows these to run concurrently, avoiding said
+		 * deadlock.
+		 */
+		final Thread completeQueueThread =
+			new Thread()
+			{
+				@Override
+				public void run()
+				{
+					// Only allow the thread to live while we are running
+					while( running )
+					{
+						try
+						{
+							// Check for deliveryComplete callbacks...
+							MqttToken token = null;
+							synchronized( completeQueue )
+							{
+								if( !completeQueue.isEmpty() )
+								{
+									token = (MqttToken) completeQueue.elementAt( 0 );
+									completeQueue.removeElementAt( 0 );
+								}
+							}
+							if( null != token )
+							{
+								// Handle the delivery complete
+								handleActionComplete( token );
+							}
+							else
+							{
+								synchronized( workAvailable )
+								{
+									if( completeQueue.isEmpty() )
+									{
+										// Only wait if our work queue is empty
+										workAvailable.wait( 60 * 1000 );
+									}
+								}
+							}
+						}
+						catch( Exception ex )
+						{
+							ex.printStackTrace();
+						}
+					}
+				}
+			};
+		completeQueueThread.setDaemon( true );
+		completeQueueThread.start();
+
 		final String methodName = "run";
 		callbackThread = Thread.currentThread();
 		callbackThread.setName(threadName);
@@ -166,8 +221,7 @@ public class CommsCallback implements Runnable {
 				// If no work is currently available, then wait until there is some...
 				try {
 					synchronized (workAvailable) {
-						if (running && messageQueue.isEmpty()
-								&& completeQueue.isEmpty()) {
+						if (running && messageQueue.isEmpty()) {
 							// @TRACE 704=wait for workAvailable
 							log.fine(CLASS_NAME, methodName, "704");
 							workAvailable.wait();
@@ -177,19 +231,19 @@ public class CommsCallback implements Runnable {
 				}
 
 				if (running) {
-					// Check for deliveryComplete callbacks...
-					MqttToken token = null;
-					synchronized (completeQueue) {
-					    if (!completeQueue.isEmpty()) {
-						    // First call the delivery arrived callback if needed
-						    token = (MqttToken) completeQueue.elementAt(0);
-						    completeQueue.removeElementAt(0);
-					    }
-					}
-					if (null != token) {
-						handleActionComplete(token);
-					}
-					
+//					// Check for deliveryComplete callbacks...
+//					MqttToken token = null;
+//					synchronized (completeQueue) {
+//					    if (!completeQueue.isEmpty()) {
+//						    // First call the delivery arrived callback if needed
+//						    token = (MqttToken) completeQueue.elementAt(0);
+//						    completeQueue.removeElementAt(0);
+//					    }
+//					}
+//					if (null != token) {
+//						handleActionComplete(token);
+//					}
+
 					// Check for messageArrived callbacks...
 					MqttPublish message = null;
 					synchronized (messageQueue) {
@@ -432,9 +486,9 @@ public class CommsCallback implements Runnable {
 		final String methodName = "asyncOperationComplete";
 
 		if (running) {
-			// invoke callbacks on callback thread
-			completeQueue.addElement(token);
 			synchronized (workAvailable) {
+			    // invoke callbacks on callback thread
+			    completeQueue.addElement(token);
 				// @TRACE 715=new workAvailable. key={0}
 				log.fine(CLASS_NAME, methodName, "715", new Object[] { token.internalTok.getKey() });
 				workAvailable.notifyAll();

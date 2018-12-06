@@ -409,18 +409,22 @@ public class ClientComms {
 			stoppingComms = false;
 		}
 
+		// Make sure the callback doesn't change in the next
+		// couple of checks.
+		final CommsCallback currentCallback = callback;
+
 		// Internal disconnect processing has completed.  If there
 		// is a disconnect token or a connect in error notify
 		// it now. This is done at the end to allow a new connect
 		// to be processed and now throw a currently disconnecting error.
 		// any outstanding tokens and unblock any waiters
 		if (endToken != null & callback != null) {
-			callback.asyncOperationComplete(endToken);
+			currentCallback.asyncOperationComplete(endToken);
 		}
 
-		if (wasConnected && callback != null) {
+		if (wasConnected && currentCallback != null) {
 			// Let the user know client has disconnected either normally or abnormally
-			callback.connectionLost(reason);
+			currentCallback.connectionLost(reason);
 		}
 
 		// While disconnecting, close may have been requested - try it now
@@ -750,7 +754,7 @@ public class ClientComms {
 			clientState.quiesce(quiesceTimeout);
 			try {
 				internalSend(disconnect, token);
-				token.internalTok.waitUntilSent();
+				token.internalTok.waitUntilSent( 30 * 1000 );
 			}
 			catch (MqttException ex) {
 			}
